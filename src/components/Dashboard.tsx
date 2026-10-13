@@ -36,14 +36,15 @@ function uid() {
 }
 
 const TABS: [Tab, string][] = [
+  ["build", "Build"],
+  ["launch", "Launch"],
   ["weekly", "Weekly Goals"],
   ["socials", "Socials"],
   ["website", "Website"],
   ["performance", "Performance"],
   ["report", "Performance Report"],
-  ["build", "Build"],
-  ["launch", "Launch"],
 ];
+
 const BUILD_SUBS: [BoardTab, string][] = [
   ["build-discover", "Discover"],
   ["build-define", "Define"],
@@ -84,7 +85,7 @@ export default function Dashboard({ userId }: { userId: string }) {
   const [ready, setReady] = useState(false);
   const [localName, setLocalName] = useState("");
 
-  const [activeTab, setActiveTab] = useState<Tab>("weekly");
+  const [activeTab, setActiveTab] = useState<Tab>("build");
   const [buildSub, setBuildSub] = useState<BoardTab>("build-discover");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
