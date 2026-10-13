@@ -332,3 +332,15 @@ a{text-decoration:none}
 .subtab[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:var(--shadow-sm)}
 .subtab .cnt{font-family:"Hanken Grotesk",system-ui,sans-serif;font-size:11.5px;font-weight:700;background:var(--surface-2);color:var(--muted);border-radius:999px;padding:1px 7px}
 .subtab[aria-selected="true"] .cnt{background:var(--accent-soft);color:var(--accent)}
+
+/* Discover / Define sections */
+.secs{display:flex;flex-direction:column;gap:14px}
+.sec{border:1px solid var(--border);background:var(--surface);border-radius:var(--r-lg);padding:14px 16px 16px;box-shadow:var(--shadow-sm)}
+.sec-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;min-height:30px}
+.sec-t{font-family:var(--disp);font-weight:700;font-size:16px;margin:0}
+.sec-n{font-size:11.5px;font-weight:700;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px}
+.sec-acts{margin-left:auto}
+.sec .row{box-shadow:none;background:var(--bg)}
+.sec .add{margin-top:8px}
+.sec .done-sec{margin-top:12px}
+.add-sec{margin-top:14px;background:var(--surface)}

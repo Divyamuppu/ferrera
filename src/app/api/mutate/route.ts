@@ -35,8 +35,8 @@ export async function POST(req: Request) {
         break;
 
       case "addTask":
-        await sql`insert into tasks (id, tab, body, done, url, position, created_at, created_by)
-                  values (${p.id}, ${p.tab}, ${p.body}, false, '', ${p.position}, ${p.createdAt}, ${p.createdBy})`;
+        await sql`insert into tasks (id, tab, section_id, body, done, url, position, created_at, created_by)
+                  values (${p.id}, ${p.tab}, ${p.sectionId ?? null}, ${p.body}, false, '', ${p.position}, ${p.createdAt}, ${p.createdBy})`;
         break;
       case "updateTask":
         await sql`update tasks set
@@ -49,7 +49,24 @@ export async function POST(req: Request) {
         await sql`delete from tasks where id = ${p.id}`;
         break;
       case "clearCompleted":
-        await sql`delete from tasks where tab = ${p.tab} and done = true`;
+        if (p.sectionId === undefined)
+          await sql`delete from tasks where tab = ${p.tab} and done = true`;
+        else if (p.sectionId === null)
+          await sql`delete from tasks where tab = ${p.tab} and done = true and section_id is null`;
+        else
+          await sql`delete from tasks where tab = ${p.tab} and done = true and section_id = ${p.sectionId}`;
+        break;
+
+      case "addSection":
+        await sql`insert into sections (id, tab, name, position, created_at)
+                  values (${p.id}, ${p.tab}, ${String(p.name).slice(0, 80)}, ${p.position}, ${p.createdAt})`;
+        break;
+      case "renameSection":
+        await sql`update sections set name = ${String(p.name).slice(0, 80)} where id = ${p.id}`;
+        break;
+      case "deleteSection":
+        await sql`delete from tasks where section_id = ${p.id}`;
+        await sql`delete from sections where id = ${p.id}`;
         break;
 
       case "addReport":
@@ -79,6 +96,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ ok: true });
   } catch (e) {
+    console.error("[mutate]", e);
     return new NextResponse(String(e), { status: 500 });
   }
 }

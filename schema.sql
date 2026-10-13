@@ -20,9 +20,18 @@ create table if not exists tasks (
   url        text not null default '',
   position   double precision not null default 0,
   created_at bigint not null,
-  created_by text
+  created_by text,
+  section_id text                    -- Build › Discover / Define sections
 );
 create index if not exists tasks_tab_idx on tasks (tab);
+
+create table if not exists sections (
+  id         text primary key,
+  tab        text not null,          -- build-discover | build-define
+  name       text not null,
+  position   double precision not null default 0,
+  created_at bigint not null
+);
 
 create table if not exists report_links (
   id         text primary key,

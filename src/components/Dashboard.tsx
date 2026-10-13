@@ -11,6 +11,7 @@ import {
   type Profile,
   type QuickLink,
   type ReportLink,
+  type Section,
   type Settings,
   type Tab,
   type Task,
@@ -44,7 +45,6 @@ const TABS: [Tab, string][] = [
   ["performance", "Performance"],
   ["report", "Performance Report"],
 ];
-
 const BUILD_SUBS: [BoardTab, string][] = [
   ["build-discover", "Discover"],
   ["build-define", "Define"],
@@ -69,7 +69,8 @@ type NameModal = {
   prefill: string;
 };
 type WeekModal = { kind: "week" };
-type ModalState = LinkModal | NameModal | WeekModal | null;
+type SectionModal = { kind: "section"; id: string; name: string };
+type ModalState = LinkModal | NameModal | WeekModal | SectionModal | null;
 
 /* ================================================================== */
 export default function Dashboard({ userId }: { userId: string }) {
@@ -79,6 +80,7 @@ export default function Dashboard({ userId }: { userId: string }) {
   const [quickLinks, setQuickLinks] = useState<QuickLink[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [reportLinks, setReportLinks] = useState<ReportLink[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const isTeam = true; // no login — anyone with the link can edit
@@ -130,6 +132,7 @@ export default function Dashboard({ userId }: { userId: string }) {
       setQuickLinks(st.quickLinks);
       setTasks(st.tasks);
       setReportLinks(st.reportLinks);
+      setSections(st.sections || []);
       setComments(st.comments);
       const m: Record<string, Profile> = {};
       (st.profiles as Profile[]).forEach((p) => (m[p.id] = p));
@@ -248,7 +251,7 @@ export default function Dashboard({ userId }: { userId: string }) {
       "Couldn't update that task."
     );
   };
-  const addTask = (tab: BoardTab, body: string) => {
+  const addTask = (tab: BoardTab, body: string, sectionId: string | null = null) => {
     body = body.trim();
     if (!body) return;
     const id = uid();
@@ -258,6 +261,7 @@ export default function Dashboard({ userId }: { userId: string }) {
         api("addTask", {
           id,
           tab,
+          sectionId,
           body,
           position: pos,
           createdAt: Date.now(),
@@ -279,9 +283,9 @@ export default function Dashboard({ userId }: { userId: string }) {
       () => api("deleteTask", { id: t.id }),
       "Couldn't delete that task."
     );
-  const clearCompleted = (tab: BoardTab) => {
+  const clearCompleted = (tab: BoardTab, sectionId?: string | null) => {
     teamWrite(
-      () => api("clearCompleted", { tab }),
+      () => api("clearCompleted", { tab, sectionId }),
       "Couldn't clear completed."
     );
   };
@@ -316,6 +320,21 @@ export default function Dashboard({ userId }: { userId: string }) {
         api("editReport", { id, label: label || host(url), url }),
       "Couldn't save the report."
     );
+  const addSection = (tab: BoardTab, name: string) => {
+    name = name.trim();
+    if (!name) return;
+    const pos =
+      Math.max(0, ...sections.filter((s) => s.tab === tab).map((s) => s.position)) + 1;
+    teamWrite(
+      () =>
+        api("addSection", { id: uid(), tab, name, position: pos, createdAt: Date.now() }),
+      "Couldn't add the section."
+    );
+  };
+  const renameSection = (id: string, name: string) =>
+    teamWrite(() => api("renameSection", { id, name }), "Couldn't rename the section.");
+  const deleteSection = (id: string) =>
+    teamWrite(() => api("deleteSection", { id }), "Couldn't delete the section.");
   const deleteReport = (id: string) =>
     teamWrite(
       () => api("deleteReport", { id }),
@@ -678,22 +697,105 @@ export default function Dashboard({ userId }: { userId: string }) {
           })}
         </div>
         <React.Fragment key={buildSub}>
-          <PhContext.Provider
-            value={
-              buildSub === "build-discover"
-                ? "Add a discover task…"
-                : "Add a define task…"
-            }
-          >
-            {todoList(buildSub, true)}
-          </PhContext.Provider>
+          {buildSections()}
         </React.Fragment>
       </>
     );
   }
 
-  function todoList(tab: BoardTab, links: boolean) {
-    const all = tabTasks(tab);
+  function buildSections() {
+    const secs = sections
+      .filter((s) => s.tab === buildSub)
+      .sort((a, b) => a.position - b.position || a.createdAt - b.createdAt);
+    const loose = tabTasks(buildSub).filter((t) => !t.sectionId);
+    const isDiscover = buildSub === "build-discover";
+    return (
+      <>
+        {secs.length === 0 && loose.length === 0 && (
+          <div className="empty-s">
+            <div className="ei">
+              <Icon n="check" />
+            </div>
+            <p>
+              <b>No sections yet.</b>
+            </p>
+            <p>
+              {isDiscover
+                ? "Add a section like “Audience”, then build its checklist."
+                : "Add a section like “Positioning”, then build its checklist."}
+            </p>
+          </div>
+        )}
+        <div className="secs">
+          {loose.length > 0 && sectionCard(null)}
+          {secs.map((s) => sectionCard(s))}
+        </div>
+        {isTeam && (
+          <AddSection
+            onAdd={(name) => addSection(buildSub, name)}
+            ph={
+              isDiscover
+                ? "Add a section — e.g. Audience, Competitors, Insights…"
+                : "Add a section — e.g. Positioning, Messaging, Scope…"
+            }
+          />
+        )}
+      </>
+    );
+  }
+
+  function sectionCard(s: Section | null) {
+    const sid = s ? s.id : null;
+    const name = s ? s.name : "General";
+    const all = tabTasks(buildSub).filter((t) => (t.sectionId || null) === sid);
+    const done = all.filter((t) => t.done).length;
+    return (
+      <section className="sec" key={sid || "general"}>
+        <div className="sec-head">
+          <h3 className="sec-t">{name}</h3>
+          {all.length > 0 && (
+            <span className="sec-n">
+              {done}/{all.length}
+            </span>
+          )}
+          {isTeam && s && (
+            <span className="row-acts sec-acts">
+              <button
+                className="mini"
+                title="Rename section"
+                onClick={() => setModal({ kind: "section", id: s.id, name: s.name })}
+              >
+                <Icon n="pencil" />
+              </button>
+              <button
+                className="mini del"
+                title="Delete section"
+                onClick={() => {
+                  if (confirm(`Delete “${s.name}” and its checklist?`)) deleteSection(s.id);
+                }}
+              >
+                <Icon n="trash" />
+              </button>
+            </span>
+          )}
+        </div>
+        <PhContext.Provider value={`Add to ${name}…`}>
+          {todoList(buildSub, true, sid, true)}
+        </PhContext.Provider>
+      </section>
+    );
+  }
+
+  function todoList(
+    tab: BoardTab,
+    links: boolean,
+    sectionId?: string | null,
+    compact?: boolean
+  ) {
+    const all = tabTasks(tab).filter(
+      (t) => sectionId === undefined || (t.sectionId || null) === sectionId
+    );
+    const ck = sectionId ? tab + ":" + sectionId : tab;
     const active = all.filter((t) => !t.done);
     const done = all.filter((t) => t.done);
     const rowOf = (t: Task) => (
@@ -721,7 +823,7 @@ export default function Dashboard({ userId }: { userId: string }) {
     );
     return (
       <>
-        {all.length === 0 ? (
+        {all.length === 0 && compact ? null : all.length === 0 ? (
           <div className="empty-s">
             <div className="ei">
               <Icon n="check" />
@@ -742,24 +844,26 @@ export default function Dashboard({ userId }: { userId: string }) {
         ) : (
           <div className="list">{active.map(rowOf)}</div>
         )}
-        {isTeam && <AddControl onAdd={(v) => addTask(tab, v)} phKey={tab} />}
+        {isTeam && (
+          <AddControl onAdd={(v) => addTask(tab, v, sectionId ?? null)} phKey={ck} />
+        )}
         {done.length > 0 && (
           <div className="done-sec">
             <div className="done-head">
               <button
-                className={`dh-toggle${collapsed[tab] ? " collapsed" : ""}`}
-                onClick={() => setCollapsed((c) => ({ ...c, [tab]: !c[tab] }))}
+                className={`dh-toggle${collapsed[ck] ? " collapsed" : ""}`}
+                onClick={() => setCollapsed((c) => ({ ...c, [ck]: !c[ck] }))}
               >
                 <Icon n="chev" /> Completed{" "}
                 <span className="cnt">{done.length}</span>
               </button>
               {isTeam && (
-                <button className="clr" onClick={() => clearCompleted(tab)}>
+                <button className="clr" onClick={() => clearCompleted(tab, sectionId)}>
                   Clear completed
                 </button>
               )}
             </div>
-            {!collapsed[tab] && (
+            {!collapsed[ck] && (
               <div className="list done-list">{done.map(rowOf)}</div>
             )}
           </div>
@@ -1197,6 +1301,18 @@ export default function Dashboard({ userId }: { userId: string }) {
               }}
             />
           )}
+          {modal.kind === "section" && (
+            <WeekModalBody
+              title="Rename section"
+              sub="Shown as the heading for this checklist."
+              value={modal.name}
+              onCancel={() => setModal(null)}
+              onSave={(v) => {
+                renameSection(modal.id, v);
+                setModal(null);
+              }}
+            />
+          )}
           {modal.kind === "link" && (
             <LinkModalBody
               modal={modal}
@@ -1545,10 +1661,14 @@ function NameModalBody({
 }
 
 function WeekModalBody({
+  title,
+  sub,
   value,
   onCancel,
   onSave,
 }: {
+  title?: string;
+  sub?: string;
   value: string;
   onCancel: () => void;
   onSave: (v: string) => void;
@@ -1556,8 +1676,8 @@ function WeekModalBody({
   const [val, setVal] = useState(value);
   return (
     <>
-      <h3>Week label</h3>
-      <p className="mh-sub">Shown next to today&apos;s date.</p>
+      <h3>{title || "Week label"}</h3>
+      <p className="mh-sub">{sub || "Shown next to today’s date."}</p>
       <div className="field">
         <label htmlFor="m-week">Label</label>
         <input
@@ -1649,5 +1769,36 @@ function LinkModalBody({
         </button>
       </div>
     </>
+  );
+}
+function AddSection({ onAdd, ph }: { onAdd: (v: string) => void; ph: string }) {
+  const [val, setVal] = useState("");
+  const submit = () => {
+    if (!val.trim()) return;
+    onAdd(val);
+    setVal("");
+  };
+  return (
+    <div className={`add add-sec${val.trim() ? " ready" : ""}`}>
+      <span>
+        <Icon n="plus" />
+      </span>
+      <input
+        type="text"
+        placeholder={ph}
+        value={val}
+        aria-label={ph}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+        }}
+      />
+      <button className="go-add" onClick={submit}>
+        Add section
+      </button>
+    </div>
   );
 }

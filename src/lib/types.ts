@@ -32,6 +32,15 @@ export interface Task {
   url: string;
   position: number;
   createdAt: number;
+  sectionId?: string | null;
+}
+
+export interface Section {
+  id: string;
+  tab: BoardTab;
+  name: string;
+  position: number;
+  createdAt: number;
 }
 
 export interface ReportLink {
